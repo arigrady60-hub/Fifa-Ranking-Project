@@ -1,0 +1,249 @@
+---
+title: "Deliverable 3: Data Preprocessing"
+author: "Ariela Grady"
+date: "10/26/26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(knitr)
+library(lubridate)
+```
+
+# Introduction
+
+This report provides an initial exploration of the FIFA World Ranking dataset. The purpose of this analysis is to understand the structure and quality of the data before performing more advanced analyses later in the semester. The report includes a data dictionary, summary statistics, an assessment of data cleanliness, and a discussion of key findings.
+
+# Data Dimensions
+
+```{r}
+fifa <- read.csv("fifa_ranking.csv")
+
+print(nrow(fifa))
+print(ncol(fifa))
+```
+
+### Description
+
+The dataset contains the historical FIFA rankings of national soccer teams. Each row represents a country's ranking at a specific date, while each column contains information about ranking performance, points earned, or country identification.
+
+# Data Dictionary
+
+```{r}
+data_dictionary <- data.frame(
+  Variable = names(fifa),
+  Data_Type = sapply(fifa, class)
+)
+
+kable(data_dictionary,
+      caption = "Data Dictionary")
+```
+
+### Description
+
+The table above lists every variable contained in the dataset along with its data type. Variables consist of numerical ranking metrics, categorical country identifiers, and date information.
+
+# Summary Statistics
+
+## Overall Summary
+
+```{r}
+summary(fifa)
+```
+
+### Description
+
+The summary statistics provide measures such as minimum values, maximum values, medians, means, and quartiles for numerical variables. These summaries help identify the range and distribution of values present in the dataset.
+
+# Numerical Variable Analysis
+
+## Distribution of FIFA Rank
+
+```{r}
+hist(fifa$rank,
+     main = "Distribution of FIFA Rankings",
+     xlab = "Rank",
+     col = "lightblue",
+     border = "white")
+```
+
+### Description
+
+This histogram shows the distribution of ranking positions within the dataset. The rankings span a large range, reflecting the numerous national teams represented in FIFA's ranking system.
+
+## Distribution of Total Points
+
+```{r}
+if("total_points" %in% names(fifa)) {
+
+hist(fifa$total_points,
+     main = "Distribution of Total Points",
+     xlab = "Total Points",
+     col = "lightgreen",
+     border = "white")
+
+}
+```
+
+### Description
+
+The total points variable measures the number of ranking points earned by each national team. This visualization helps identify whether most teams cluster around similar point totals or whether a few countries stand out.
+
+## Distribution of Rank Change
+
+```{r}
+if("rank_change" %in% names(fifa)) {
+
+hist(fifa$rank_change,
+     main = "Distribution of Rank Changes",
+     xlab = "Rank Change",
+     col = "lightcoral",
+     border = "white")
+
+}
+```
+
+### Description
+
+Rank change measures how much a country's ranking has improved or worsened between ranking periods. Most values are expected to center near zero because dramatic changes in rankings are relatively uncommon.
+
+# Categorical Variable Analysis
+
+## Confederation Frequency
+
+```{r}
+if("confederation" %in% names(fifa)) {
+
+confed_table <- table(fifa$confederation)
+
+kable(as.data.frame(confed_table),
+      col.names = c("Confederation", "Frequency"),
+      caption = "Frequency of Confederations")
+
+barplot(confed_table,
+        col = "steelblue",
+        main = "Teams by Confederation",
+        las = 2)
+
+}
+```
+
+### Description
+
+The confederation variable identifies the regional governing body associated with each national team. The frequency table and bar chart show the representation of each confederation within the dataset.
+
+# Time-Based Exploration
+
+## Brazil Ranking Through Time
+
+```{r}
+if("country_full" %in% names(fifa) &&
+   "rank_date" %in% names(fifa)) {
+
+fifa$rank_date <- as.Date(fifa$rank_date)
+
+brazil <- fifa %>%
+  filter(country_full == "Brazil")
+
+if(nrow(brazil) > 0){
+
+ggplot(brazil,
+       aes(x = rank_date,
+           y = rank)) +
+  geom_line(color = "darkgreen") +
+  scale_y_reverse() +
+  labs(
+    title = "Brazil FIFA Ranking Over Time",
+    x = "Date",
+    y = "Rank"
+  )
+
+}
+
+}
+```
+
+### Description
+
+This figure tracks Brazil's ranking across time. Because a lower numerical rank indicates stronger performance, the y-axis is reversed to make improvements appear higher on the graph.
+
+# Data Cleanliness
+
+## Missing Values
+
+```{r}
+missing_values <- colSums(is.na(fifa))
+
+kable(
+  data.frame(
+    Variable = names(missing_values),
+    Missing_Values = missing_values
+  ),
+  caption = "Missing Values by Variable"
+)
+```
+
+### Description
+
+The table above identifies missing values for each variable. Variables with large numbers of missing observations may require cleaning or special handling during future analyses.
+
+## Duplicate Observations
+
+```{r}
+duplicates <- sum(duplicated(fifa))
+
+duplicates
+```
+
+### Description
+
+This value represents the number of completely duplicated rows in the dataset. Duplicate observations can introduce bias and should be reviewed before further analysis.
+
+## Data Structure
+
+```{r}
+str(fifa)
+```
+
+### Description
+
+The structure output confirms how each variable was imported. It helps identify whether variables have appropriate data types for analysis.
+
+## Correlation Analysis
+
+```{r}
+numeric_vars <- fifa %>%
+  select(where(is.numeric))
+
+if(ncol(numeric_vars) > 1){
+
+cor_matrix <- cor(numeric_vars,
+                  use = "pairwise.complete.obs")
+
+round(cor_matrix, 2)
+
+}
+```
+
+### Description
+
+Correlation analysis measures relationships between numerical variables. Strong positive or negative correlations may indicate variables that describe similar patterns or behaviors.
+
+# Data Quality Concerns
+
+Several potential data-quality concerns were identified during preprocessing:
+
+1. Historical countries may appear alongside modern countries.
+2. Countries occur multiple times because rankings are recorded on many dates.
+3. Some variables may contain missing values.
+4. Date fields require proper conversion to date format for time-series analyses.
+5. Certain ranking variables may be highly correlated because they measure related aspects of team performance.
+
+# Discussion
+
+The FIFA rankings dataset provides a rich collection of information regarding the historical performance of national soccer teams around the world. The dataset includes both categorical variables, such as country names and confederations, and numerical variables, such as rankings and points. Initial exploration suggests substantial variation among countries, which makes the dataset suitable for studying ranking trends and competitive performance across different regions.
+
+One particularly interesting aspect of the dataset is its time-series structure. Because countries appear repeatedly across many years, it becomes possible to examine how rankings change over time and identify periods of improvement or decline. Future analyses may focus on comparing confederations, identifying the most consistently successful countries, and exploring how ranking points influence ranking position. Additional investigation of missing values and highly correlated variables will also help improve the quality of future analyses.
