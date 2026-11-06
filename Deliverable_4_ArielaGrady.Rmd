@@ -1,0 +1,287 @@
+---
+title: "Which Fifa Men's National Team is the Most Consistent?"
+author: "Ariela Grady"
+date: "11/06/26"
+output: html_document
+---
+## Changes Since Deliverable 3
+- Converted visualizations to ggplot2.
+- Improved the Distribution of Rank Change histogram by increasing the number of bins and focusing on the most common range of values.
+- Added additional visualizations related to team consistency.
+- Expanded chart interpretations.
+- Updated summary statistics and data cleaning descriptions where appropriate.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(knitr)
+library(lubridate)
+```
+
+# Introduction
+
+The purpose of this project is to determine which FIFA men's national team has been the most consistent between 1993 and 2018. Consistency is important because a team may remain successful or unsuccessful for long periods, and understanding consistency can provide insight into whether rankings accurately reflect long-term performance. This analysis explores ranking distributions, ranking changes, and team performance over time to investigate consistency among national teams.
+
+# Data Dimensions
+
+```{r}
+fifa <- read.csv("fifa_ranking.csv")
+
+print(nrow(fifa))
+print(ncol(fifa))
+```
+
+### Description
+
+The dataset contains the historical FIFA rankings of national soccer teams. Each row represents a country's ranking at a specific date, while each column contains information about ranking performance, points earned, or country identification.
+
+# Data Dictionary
+
+```{r}
+data_dictionary <- data.frame(
+  Variable = names(fifa),
+  Data_Type = sapply(fifa, class),
+  Description = c(
+    "Current FIFA ranking position. Lower values indicate better performance.",
+    "Full name of the men's national team.",
+    "Abbreviation used to identify a national team.",
+    "Total FIFA ranking points for a team.",
+    "FIFA points from the previous ranking period.",
+    "Change in ranking position since the previous ranking release.",
+    "Average performance points earned during the current year.",
+    "Weighted average of current-year performance points used in FIFA rankings.",
+    "Average performance points earned during the previous year.",
+    "Weighted average of previous-year performance points.",
+    "Average performance points earned two years prior.",
+    "Weighted average of performance points earned two years prior.",
+    "Average performance points earned three years prior.",
+    "Weighted average of performance points earned three years prior.",
+    "The FIFA confederation to which the national team belongs (e.g., UEFA, CONMEBOL, CONCACAF, AFC, CAF, OFC).",
+    "The date on which the FIFA rankings were published. This variable is used to track ranking changes over time."
+  )
+)
+
+kable(data_dictionary,
+      caption = "Data Dictionary")
+```
+
+### Description
+
+The table above lists every variable contained in the dataset along with its data type. Variables consist of numerical ranking metrics, categorical country identifiers, and date information.
+
+# Summary Statistics
+
+## Overall Summary
+
+```{r}
+summary(fifa %>%
+          select(rank, total_points, rank_change))
+```
+
+### Description
+
+The summary statistics provide an overview of ranking positions, FIFA points, and ranking changes across all teams and years.
+
+# Visualizations
+
+## Visualization 1: Distribution of FIFA Rank
+
+```{r}
+ggplot(fifa,
+       aes(x = rank)) +
+  geom_histogram(
+    bins = 30,
+    fill = "#1F77B4",
+    color = "black"
+  ) +
+  labs(
+    title = "Distribution of FIFA Rankings",
+    x = "FIFA Rank",
+    y = "Number of Observations"
+  ) +
+  theme_minimal()
+```
+
+### Interpretation
+
+This histogram shows the distribution of FIFA rankings across all teams in the dataset. The rankings are spread throughout the ranking system, although certain ranking positions appear more frequently than others. This suggests that teams occupy a wide range of performance levels. Because one goal of this project is determining whether the most consistent teams are top, middle, or bottom-ranked teams, understanding the overall distribution of rankings provides useful context. Future analysis will compare consistency measurements to average ranking positions.
+
+## Visualization 2: Distribution of Rank Changes
+
+```{r}
+ggplot(fifa,
+       aes(x = rank_change)) +
+  geom_histogram(
+    bins = 40,
+    fill = "#1F77B4",
+    color = "black"
+  ) +
+  coord_cartesian(xlim = c(-50, 50)) +
+  labs(
+    title = "Distribution of FIFA Rank Changes",
+    x = "Rank Change",
+    y = "Number of Observations"
+  ) +
+  theme_minimal()
+```
+
+### Interpretation
+
+The histogram displays the distribution of changes in FIFA rankings over time.The variable used is rank_change. Most observations are concentrated around zero, indicating that large ranking changes are relatively uncommon. This suggests that FIFA rankings tend to be fairly stable from one ranking period to the next. One possible explanation is that international soccer teams generally improve or decline gradually rather than making dramatic jumps in performance. The next step will be identifying which individual teams experience the smallest ranking fluctuations over time.
+
+## Visualization 3: Average Brazil Ranking by Year
+
+```{r}
+fifa$rank_date<-as.Date(fifa$rank_date)
+
+library(dplyr)
+library(lubridate)
+
+brazil <- fifa %>%
+  filter(country_full == "Brazil")
+
+brazil_yearly <- brazil %>%
+  mutate(year = year(rank_date)) %>%
+  group_by(year) %>%
+  summarize(avg_rank = mean(rank))
+
+ggplot(brazil_yearly,
+       aes(x = year,
+           y = avg_rank)) +
+  geom_line(color = "#E3B505", linewidth = 1.2) +
+  geom_point(color = "#E3B505") +
+  scale_y_reverse() +
+  labs(
+    title = "Average Brazil FIFA Ranking by Year",
+    x = "Year",
+    y = "Average FIFA Rank"
+  ) +
+  theme_minimal()
+```
+
+### Interpretation
+
+This line graph shows Brazil's average FIFA ranking by year from 1993 to 2018. The variables used are year and average FIFA rank.Because lower ranking values indicate better performance, the y- axis is reversed so that better rankings appear higher on the graph.Brazil remained near the top of the rankings for most of the period, with relatively small changes from year to year. This suggests that Brazil has been a consistently strong team over time. To determine whether Brazil is the most consistent team, I would compare its ranking variation to other national teams using a measure such as the standard deviation of rankings.
+
+## Visualization 4: Ten Most Consistent Teams
+
+```{r}
+team_consistency <- fifa %>%
+  group_by(country_full) %>%
+  summarize(
+    rank_sd = sd(rank, na.rm = TRUE),
+    avg_rank = mean(rank, na.rm = TRUE)
+  ) %>%
+  filter(!is.na(rank_sd)) %>%
+  arrange(rank_sd) %>%
+  slice(1:10)
+
+ggplot(team_consistency,
+       aes(
+         x = reorder(country_full, rank_sd),
+         y = rank_sd
+       )) +
+  geom_col(
+    fill = "#1F77B4"
+  ) +
+  coord_flip() +
+  labs(
+    title = "Ten Most Consistent National Teams",
+    x = "Country",
+    y = "Standard Deviation of Rank"
+  ) +
+  theme_minimal()
+```
+
+### Interpretation
+
+This chart compares the ten teams with th lowest standard deviation in FIFA ranking positions. The variables used are country and ranking standard deviation. A lower standard deviation means a team's ranking changes less over time, making it a meausre of consistency. The visualization directly addresses the primary objective of the project by identifying teams with the most stable rankings. Further investigation is needed to determine whether these teams are consistently strong, consistently weak, or consistently average.
+
+# Data Cleanliness and Cleaning
+
+## Missing Values
+
+```{r}
+missing_values <- colSums(is.na(fifa))
+
+kable(
+  data.frame(
+    Variable = names(missing_values),
+    Missing_Values = missing_values
+  ),
+  caption = "Missing Values by Variable"
+)
+
+sum(is.na(fifa))
+duplicated(fifa)
+```
+
+### Description
+
+The dataset was examined for missing values, duplicate observations, and formatting issues. Date variables were converted to appropriate date formats and country names were standardized where necessary. Any observations with missing ranking information were excluded from analyses requiring complete ranking data.
+
+## Duplicate Observations
+
+```{r}
+duplicates <- sum(duplicated(fifa))
+
+duplicates
+```
+
+### Description
+
+This value represents the number of completely duplicated rows in the dataset. Duplicate observations can introduce bias and should be reviewed before further analysis.
+
+## Data Structure
+
+```{r}
+str(fifa)
+```
+
+### Description
+
+The structure output confirms how each variable was imported. It helps identify whether variables have appropriate data types for analysis.
+
+## Correlation Analysis
+
+```{r}
+numeric_vars <- fifa %>%
+  select(where(is.numeric))
+
+if(ncol(numeric_vars) > 1){
+
+cor_matrix <- cor(numeric_vars,
+                  use = "pairwise.complete.obs")
+
+round(cor_matrix, 2)
+
+}
+```
+
+### Description
+
+Correlation analysis measures relationships between numerical variables. Strong positive or negative correlations may indicate variables that describe similar patterns or behaviors.
+
+# Data Quality Concerns
+
+Several potential data-quality concerns were identified during preprocessing:
+
+1. Historical countries may appear alongside modern countries.
+2. Countries occur multiple times because rankings are recorded on many dates.
+3. Some variables may contain missing values.
+4. Date fields require proper conversion to date format for time-series analyses.
+5. Certain ranking variables may be highly correlated because they measure related aspects of team performance.
+
+# Discussion
+
+The FIFA rankings dataset provides a rich collection of information regarding the historical performance of national soccer teams around the world. The dataset includes both categorical variables, such as country names and confederations, and numerical variables, such as rankings and points. Initial exploration suggests substantial variation among countries, which makes the dataset suitable for studying ranking trends and competitive performance across different regions.
+
+One particularly interesting aspect of the dataset is its time-series structure. Because countries appear repeatedly across many years, it becomes possible to examine how rankings change over time and identify periods of improvement or decline. Future analyses may focus on comparing confederations, identifying the most consistently successful countries, and exploring how ranking points influence ranking position. Additional investigation of missing values and highly correlated variables will also help improve the quality of future analyses.
+
+# Overall Take
+The analyses completed so far suggests that FIFA rankings are generally stable over time. The distribution of ranking changes shows that most teams do not experience dramatic movement between ranking periods, and many teams remain within relatively similar ranking ranges for extended periods. This indicates that consistency may be a meaningful characteristic when evaluating national team performance.
+
+One interesting observation is that highly successful teams such as Brazil appear near the top of the rankings for much of the study period. However, the relationship between consistency and quality of performance is still unclear. A team can be highly consistent while remaining near the bottom of the rankings, near the top, or somewhere in the middle. This highlights the importance of examining both consistency and average ranking together.
+
+For the final draft, I plan to calculate consistency measures for every team, identify the single most consistent national team, and compare that team's ranking history with other teams. I also plan to examine whether World Cup-winning nations tend to have higher levels of consistency than other countries and investigate what characteristics the most consistent teams share.
